@@ -4,6 +4,12 @@ Pipeline de datos de extremo a extremo que ingesta datos públicos de **demanda 
 
 **Pregunta de negocio:** ¿cómo afectan la temperatura y el calendario laboral a la demanda eléctrica en España, y cómo evoluciona el peso de las renovables en el mix?
 
+### 👉 [Ver el dashboard en vivo](https://energia-clima-espana.streamlit.app/)
+
+![Dashboard en Streamlit](docs/dashboard.png)
+
+### Orquestación en Airflow
+
 ![DAG en Airflow](docs/airflow_dag.png)
 
 ---
@@ -24,12 +30,13 @@ flowchart LR
             S[(Silver<br/>tipado + dedup)]
             G[(Gold<br/>modelo estrella)]
         end
+        EXP[Exportación<br/>gold → Parquet]
     end
 
     REE --> EX
     OM --> EX
-    EX --> B --> S --> G
-    G --> V[Dashboard<br/>Evidence]
+    EX --> B --> S --> G --> EXP
+    EXP --> V[Dashboard Streamlit<br/>Community Cloud]
 ```
 
 ## Stack
@@ -41,7 +48,7 @@ flowchart LR
 | Transformación | dbt-core 1.12 + dbt-duckdb, `dbt_utils` |
 | Almacén | DuckDB |
 | Ingesta | Python (`requests`) con reintentos y backoff |
-| Visualización | Evidence *(en desarrollo)* |
+| Visualización | Streamlit + Altair, desplegado en Streamlit Community Cloud |
 
 ## Fuentes de datos
 
@@ -92,6 +99,8 @@ Desanidado con `unnest`, tipado con esquemas explícitos en `from_json` y dedupl
 - **dbt aislado de Airflow.** dbt vive en su propio entorno virtual dentro de la imagen, para evitar conflictos de dependencias. Cosmos lo invoca mediante `dbt_executable_path`.
 - **Carga histórica separada del incremental.** El histórico se carga una vez con el script de extracción, y el DAG solo procesa el día a día. Un backfill de cientos de días a través de Airflow supondría cientos de ejecuciones completas de dbt.
 - **Silver materializado como `table`.** Con este volumen, reconstruirlo entero tarda menos de un segundo. Un modelo incremental añadiría complejidad sin beneficio.
+- **Capa de consumo en Parquet.** El almacén DuckDB se queda en local; el DAG exporta solo las tablas gold a Parquet, que se versionan en el repo y alimentan el dashboard publicado.
+- **Un único punto de acceso a datos en la app.** Toda consulta pasa por `consulta()`, de modo que portar el dashboard a Streamlit in Snowflake solo requiere cambiar esa función.
 - **Portabilidad.** El SQL evita, en lo posible, funciones exclusivas de DuckDB, para poder añadir un target de Snowflake en `profiles.yml`.
 
 ## Estructura del repositorio
@@ -100,8 +109,13 @@ Desanidado con `unnest`, tipado con esquemas explícitos en `from_json` y dedupl
 energia-clima-pipeline/
 ├── dags/
 │   └── energia_clima_pipeline.py   # DAG diario con Cosmos
-├── include/extract/
-│   └── extract.py                  # Extractor REE + Open-Meteo
+├── include/
+│   ├── extract/extract.py          # Extractor REE + Open-Meteo
+│   └── export/export_gold.py       # Exportación de gold a Parquet
+├── app/
+│   ├── streamlit_app.py            # Dashboard
+│   ├── requirements.txt
+│   └── data/                       # Parquet de la capa gold (capa de consumo)
 ├── dbt_project/
 │   ├── dbt_project.yml
 │   ├── profiles.yml
@@ -116,6 +130,13 @@ energia-clima-pipeline/
 ├── docker-compose.yml
 └── requirements.txt
 ```
+
+## Hallazgos
+
+- **Apagón ibérico (28/04/2025):** la demanda cae a unos 400 GWh, el mínimo de toda la serie. El evento queda reflejado en la capa gold sin ningún tratamiento especial.
+- **Doble estacionalidad:** la demanda tiene picos en invierno (calefacción) y en verano (refrigeración). El máximo de la serie es el 23/07/2026, en plena ola de calor.
+- **Efecto calendario:** fines de semana y festivos reducen la demanda tanto como varios grados de temperatura.
+- **Renovables:** en torno al 56 % de la generación entre enero de 2025 y octubre de 2026.
 
 ## Cómo ejecutarlo
 
@@ -143,6 +164,12 @@ docker compose up -d --build
 
 Abre http://localhost:8080, activa el DAG `energia_clima_pipeline` y lánzalo con **Trigger**.
 
+Para lanzar el dashboard en local:
+```bash
+uv pip install -r app/requirements.txt
+streamlit run app/streamlit_app.py
+```
+
 Para explorar el linaje de los modelos:
 ```bash
 cd dbt_project && dbt docs generate && dbt docs serve
@@ -153,7 +180,7 @@ cd dbt_project && dbt docs generate && dbt docs serve
 - [x] Ingesta de APIs públicas a JSON crudo
 - [x] Modelado medallion con dbt y tests de calidad
 - [x] Orquestación diaria con Airflow 3 + Cosmos
-- [ ] Dashboard en Evidence publicado en GitHub Pages
+- [x] Dashboard en Streamlit con exportación de gold a Parquet
 - [ ] Festivos nacionales en `dim_fecha`
 - [ ] Target de Snowflake
 
