@@ -34,6 +34,7 @@ services:
       - ./dbt_project:/opt/airflow/dbt_project
       - ./data:/opt/airflow/data
       - ./logs:/opt/airflow/logs
+      - ./app:/opt/airflow/app
     depends_on:
       postgres:
         condition: service_healthy
