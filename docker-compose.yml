@@ -1,0 +1,42 @@
+x-airflow-env: &airflow-env
+  AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+  AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+  AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"   # sin login, solo para local
+  PYTHONPATH: /opt/airflow
+  DBT_DUCKDB_PATH: /opt/airflow/data/warehouse.duckdb
+  DBT_RAW_PATH: /opt/airflow/data/raw
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 10
+
+  airflow:
+    build: .
+    command: standalone
+    user: "${AIRFLOW_UID:-50000}:0"
+    environment: *airflow-env
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./include:/opt/airflow/include
+      - ./dbt_project:/opt/airflow/dbt_project
+      - ./data:/opt/airflow/data
+      - ./logs:/opt/airflow/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
