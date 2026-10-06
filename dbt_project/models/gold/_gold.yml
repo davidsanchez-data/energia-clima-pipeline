@@ -1,0 +1,33 @@
+version: 2
+
+models:
+  - name: dim_fecha
+    columns:
+      - name: fecha
+        data_tests: [unique, not_null]
+
+  - name: dim_tecnologia
+    columns:
+      - name: tecnologia_id
+        data_tests: [unique, not_null]
+
+  - name: fct_demanda_clima_diaria
+    description: Hechos diarios de demanda, clima y mix renovable.
+    columns:
+      - name: fecha
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha
+
+  - name: fct_generacion_diaria
+    columns:
+      - name: tecnologia_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_tecnologia')
+                field: tecnologia_id

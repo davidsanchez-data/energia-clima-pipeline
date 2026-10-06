@@ -1,0 +1,44 @@
+version: 2
+
+models:
+  - name: stg_ree_demanda
+    description: Demanda eléctrica nacional diaria (MWh). Una fila por día.
+    columns:
+      - name: fecha
+        data_tests: [unique, not_null]
+      - name: demanda_mwh
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false
+
+  - name: stg_ree_generacion
+    description: Generación diaria por tecnología (MWh). Una fila por día y tecnología.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [fecha, tecnologia]
+    columns:
+      - name: tipo_renovable
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Renovable', 'No-Renovable']
+              config:
+                severity: warn
+
+  - name: stg_meteo_diario
+    description: Meteorología diaria por ciudad. Una fila por día y ciudad.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [ciudad, fecha]
+    columns:
+      - name: temp_media_c
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -20
+                max_value: 50

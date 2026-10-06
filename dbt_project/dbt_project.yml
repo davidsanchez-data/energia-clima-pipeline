@@ -1,0 +1,21 @@
+name: energia_clima
+version: "1.0.0"
+profile: energia_clima
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+
+vars:
+  raw_path: "../data/raw"
+
+models:
+  energia_clima:
+    bronze:
+      +materialized: view
+      +schema: bronze
+    silver:
+      +materialized: table
+      +schema: silver
+    gold:
+      +materialized: table
+      +schema: gold
