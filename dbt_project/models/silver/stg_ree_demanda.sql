@@ -1,3 +1,10 @@
+{{ config(
+    materialized='incremental',
+    incremental_strategy='delete+insert',
+    unique_key='fecha',
+    on_schema_change='fail'
+) }}
+
 with valores as (
     select
         _extracted_at,
@@ -6,6 +13,10 @@ with valores as (
             '[{"value": "DOUBLE", "datetime": "VARCHAR"}]'
         )) as v
     from {{ ref('brz_ree_demanda') }}
+    {% if is_incremental() %}
+    -- solo los ficheros extraídos después de la última carga
+    where _extracted_at > (select max(_extracted_at) from {{ this }})
+    {% endif %}
 ),
 
 tipado as (

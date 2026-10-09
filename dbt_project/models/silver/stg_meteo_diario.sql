@@ -1,3 +1,10 @@
+{{ config(
+    materialized='incremental',
+    incremental_strategy='delete+insert',
+    unique_key=['ciudad', 'fecha'],
+    on_schema_change='fail'
+) }}
+
 with ciudades as (
     select
         _extracted_at,
@@ -10,6 +17,10 @@ with ciudades as (
                          "precipitation_sum": ["DOUBLE"]}}]'
         )) as c
     from {{ ref('brz_meteo_diario') }}
+    {% if is_incremental() %}
+    -- solo los ficheros extraídos después de la última carga
+    where _extracted_at > (select max(_extracted_at) from {{ this }})
+    {% endif %}
 ),
 
 dias as (
