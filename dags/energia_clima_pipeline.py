@@ -41,8 +41,8 @@ def energia_clima_pipeline():
     @task
     def extraer_meteo(dia: str) -> None:
         extract_meteo(*ventana(dia))
-    
-        @task.bash
+
+    @task.bash
     def exportar_gold() -> str:
         # Usa el Python del venv de dbt, que ya tiene duckdb instalado
         return "/opt/airflow/dbt_venv/bin/python /opt/airflow/include/export/export_gold.py"
