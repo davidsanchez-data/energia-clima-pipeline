@@ -98,7 +98,7 @@ Desanidado con `unnest`, tipado con esquemas explícitos en `from_json` y dedupl
 - **Un solo escritor en DuckDB.** El DAG usa `max_active_tasks=1`, porque DuckDB solo admite un proceso escribiendo a la vez.
 - **dbt aislado de Airflow.** dbt vive en su propio entorno virtual dentro de la imagen, para evitar conflictos de dependencias. Cosmos lo invoca mediante `dbt_executable_path`.
 - **Carga histórica separada del incremental.** El histórico se carga una vez con el script de extracción, y el DAG solo procesa el día a día. Un backfill de cientos de días a través de Airflow supondría cientos de ejecuciones completas de dbt.
-- **Silver materializado como `table`.** Con este volumen, reconstruirlo entero tarda menos de un segundo. Un modelo incremental añadiría complejidad sin beneficio.
+- **Silver incremental con `delete+insert` y marca de agua.** Cada modelo de silver solo procesa los ficheros con `_extracted_at` posterior a la última carga y sustituye por clave de negocio los días re-extraídos, así que los datos que llegan tarde se corrigen solos sin reconstruir la tabla.
 - **Capa de consumo en Parquet.** El almacén DuckDB se queda en local; el DAG exporta solo las tablas gold a Parquet, que se versionan en el repo y alimentan el dashboard publicado.
 - **Un único punto de acceso a datos en la app.** Toda consulta pasa por `consulta()`, de modo que portar el dashboard a Streamlit in Snowflake solo requiere cambiar esa función.
 - **Portabilidad.** El SQL evita, en lo posible, funciones exclusivas de DuckDB, para poder añadir un target de Snowflake en `profiles.yml`.
